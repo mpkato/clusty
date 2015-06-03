@@ -293,6 +293,7 @@ DEPENDENCIES
   font-awesome-rails
   jbuilder (~> 2.0)
   jquery-rails
+  jquery-ui-rails
   less-rails
   rails (= 4.2.1)
   rspec

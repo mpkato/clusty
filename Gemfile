@@ -56,6 +56,7 @@ gem 'twitter-bootstrap-rails'
 gem 'font-awesome-rails'
 gem 'less-rails'
 gem 'simple_form'
+gem 'jquery-ui-rails'
 
 # devise
 gem 'devise'
