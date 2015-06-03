@@ -1,0 +1,21 @@
+<%- model_class = Project -%>
+<div class="page-header">
+  <h1>Cluster</h1>
+</div>
+<div class="panel panel-default">
+  <div class="panel-heading">
+    <h4><%=t '.title', :default => model_class.model_name.human.titleize %>: <%= @project.label %></h4>
+  </div>
+  <div class="panel-body">
+    <% @project.elements.each do |element| %>
+      <div class="panel panel-default element">
+        <div class="panel-body">
+          <%= element.body %>
+        </div>
+      </div>
+    <% end %>
+  </div>
+</div>
+
+<%= link_to t('.back', :default => t("helpers.links.back")),
+              projects_path, :class => 'btn btn-default'  %>

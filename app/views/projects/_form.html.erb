@@ -1,10 +1,20 @@
-<%= simple_form_for @project, :html => { :class => 'form-horizontal' } do |f| %>
-  <%= f.input :label %>
-  <%= error_span(@project[:label]) %>
-  <%= f.input :user_id %>
-  <%= error_span(@project[:user_id]) %>
+<div class="panel panel-default">
+  <div class="panel-heading">
+    <h4>Project</h4>
+  </div>
+  <div class="panel-body">
+    <%= simple_form_for @project, :html => { :class => 'form-horizontal' } do |f| %>
+      <%= f.input :label %>
+      <%= error_span(@project[:label]) %>
 
-  <%= f.button :submit, :class => 'btn-primary' %>
-  <%= link_to t('.cancel', :default => t("helpers.links.cancel")),
-                projects_path, :class => 'btn btn-default' %>
-<% end %>
+      <% if new_template %>
+        <%= f.input :element_file, as: :file %>
+        <%= error_span(@project[:element_file]) %>
+      <% end %>
+
+      <%= f.button :submit, :class => 'btn-primary' %>
+      <%= link_to t('.cancel', :default => t("helpers.links.cancel")),
+                    projects_path, :class => 'btn btn-default' %>
+    <% end %>
+  </div>
+</div>
