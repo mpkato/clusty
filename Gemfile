@@ -57,6 +57,7 @@ gem 'font-awesome-rails'
 gem 'less-rails'
 gem 'simple_form'
 gem 'jquery-ui-rails'
+gem "d3-rails"
 
 # devise
 gem 'devise'
