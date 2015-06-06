@@ -3,7 +3,7 @@
 
   d3.layout.grid = function() {
     var mode = "equal",
-        layout = tree,
+        layout = _distributeEqually,
         x = d3.scale.ordinal(),
         y = d3.scale.ordinal(),
         size = [1, 1],
@@ -15,9 +15,6 @@
 
     function grid(nodes) {
       return layout(nodes);
-    }
-
-    function tree(root) {
     }
 
     function _distributeEqually(nodes) {
