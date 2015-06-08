@@ -5,6 +5,7 @@ Rails.application.routes.draw do
 
   root to: "home#index"
   resources :projects do
+    resources :clusters
     member do
       get :cluster
     end

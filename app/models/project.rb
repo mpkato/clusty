@@ -2,6 +2,7 @@ require 'csv'
 class Project < ActiveRecord::Base
   belongs_to :user
   has_many :elements, dependent: :destroy
+  has_many :clusters, dependent: :destroy
 
   attr_accessor :element_file
 

@@ -11,7 +11,16 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema.define(version: 20150602203014) do
+ActiveRecord::Schema.define(version: 20150608133404) do
+
+  create_table "clusters", force: :cascade do |t|
+    t.string   "name"
+    t.integer  "project_id"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+  end
+
+  add_index "clusters", ["project_id"], name: "index_clusters_on_project_id"
 
   create_table "elements", force: :cascade do |t|
     t.string   "key"
@@ -23,6 +32,16 @@ ActiveRecord::Schema.define(version: 20150602203014) do
 
   add_index "elements", ["key"], name: "index_elements_on_key"
   add_index "elements", ["project_id"], name: "index_elements_on_project_id"
+
+  create_table "memberships", force: :cascade do |t|
+    t.integer  "cluster_id"
+    t.integer  "element_id"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+  end
+
+  add_index "memberships", ["cluster_id"], name: "index_memberships_on_cluster_id"
+  add_index "memberships", ["element_id"], name: "index_memberships_on_element_id"
 
   create_table "projects", force: :cascade do |t|
     t.string   "label"
