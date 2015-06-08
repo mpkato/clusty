@@ -1,1 +1,4 @@
-json.extract! @cluster, :id, :name, :project_id, :created_at, :updated_at
+json.extract! @cluster, :id, :name
+json.elements @cluster.elements do |element|
+  json.extract! element, :id, :key, :body
+end

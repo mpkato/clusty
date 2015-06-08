@@ -1,4 +1,6 @@
 json.array!(@clusters) do |cluster|
-  json.extract! cluster, :id, :name, :project_id
-  json.url cluster_url(cluster, format: :json)
+  json.extract! cluster, :id, :name
+  json.elements cluster.elements do |element|
+    json.extract! element, :id, :key, :body
+  end
 end

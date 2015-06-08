@@ -5,7 +5,7 @@ Rails.application.routes.draw do
 
   root to: "home#index"
   resources :projects do
-    resources :clusters
+    resources :clusters, :defaults => { format: :json  }
     member do
       get :cluster
     end

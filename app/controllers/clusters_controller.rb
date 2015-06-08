@@ -44,6 +44,11 @@ class ClustersController < ApplicationController
       @project = Project.includes(:clusters).find(params[:project_id])
     end
 
+    # Use callbacks to share common setup or constraints between actions.
+    def set_cluster
+      @cluster = Cluster.includes(:elements).find(params[:id])
+    end
+
     # Never trust parameters from the scary internet, only allow the white list through.
     def cluster_params
       params.require(:cluster).permit(:name, :project_id)
