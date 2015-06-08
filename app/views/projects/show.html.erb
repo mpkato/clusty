@@ -1,30 +1,21 @@
 <%- model_class = Project -%>
 <div class="page-header">
-  <h1><%=t '.title', :default => model_class.model_name.human.titleize %>: <%= @project.label %></h1>
+  <h1>Cluster</h1>
 </div>
-<table class="table table-striped">
-  <thead>
-    <tr>
-      <th>Key</th>
-      <th>Body</th>
-    </tr>
-  </thead>
-  <tbody>
+<div class="panel panel-default">
+  <div class="panel-heading">
+    <h4><%=t '.title', :default => model_class.model_name.human.titleize %>: <%= @project.label %></h4>
+  </div>
+  <div id="field" class="panel-body">
     <% @project.elements.each do |element| %>
-      <tr>
-        <td><%= element.key %></td>
-        <td><%= element.body %></td>
-      </tr>
+      <div class="panel panel-default element">
+        <div class="panel-body">
+          <%= element.body %>
+        </div>
+      </div>
     <% end %>
-  <tbody>
-</table>
+  </div>
+</div>
 
 <%= link_to t('.back', :default => t("helpers.links.back")),
               projects_path, :class => 'btn btn-default'  %>
-<%= link_to t('.edit', :default => t("helpers.links.edit")),
-              edit_project_path(@project), :class => 'btn btn-default' %>
-<%= link_to t('.destroy', :default => t("helpers.links.destroy")),
-              project_path(@project),
-              :method => 'delete',
-              :data => { :confirm => t('.confirm', :default => t("helpers.links.confirm", :default => 'Are you sure?')) },
-              :class => 'btn btn-danger' %>

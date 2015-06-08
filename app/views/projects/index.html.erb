@@ -19,7 +19,9 @@
         <td><%=l project.created_at %></td>
         <td>
           <%= link_to 'Show', project_path(project), :class => 'btn btn-default btn-xs' %>
-          <%= link_to 'Cluster', cluster_project_path(project), :class => 'btn btn-primary btn-xs' %>
+          <%= link_to 'Edit', edit_project_path(project), :class => 'btn btn-default btn-xs' %>
+          <%= link_to 'Destroy', project_path(project), :method => 'delete',
+            :data => { :confirm => 'Are you sure?' }, :class => 'btn btn-danger btn-xs' %>
         </td>
       </tr>
     <% end %>

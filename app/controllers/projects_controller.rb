@@ -62,11 +62,6 @@ class ProjectsController < ApplicationController
     end
   end
 
-
-  # GET /projects/1/cluster
-  def cluster
-  end
-
   def cluster_json
     data = <<EOS
 {
