@@ -17,6 +17,7 @@
       return layout(nodes);
     }
 
+
     function _distributeEqually(nodes) {
       var i = -1, 
           n = nodes.length,
