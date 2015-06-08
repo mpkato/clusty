@@ -1,461 +1,333 @@
-$ -> 
-    d3.json("/projects/cluster_json", (error, treeData) ->
-        # Calculate total nodes, max label length
-        totalNodes = 0
-        maxLabelLength = 0
-        # variables for drag/drop
-        selectedNode = null
-        draggingNode = null
-        # panning variables
-        panSpeed = 200
-        panBoundary = 20 # Within 20px from edges will pan when dragging.
-        # Misc. variables
-        i = 0
-        duration = 750
-        root = null
+$ ->
+    trans = (x, y) ->
+        return "translate(#{x}, #{y})"
 
-        # added by kato
-        domNode = null
-        nodes = null
-        dragStarted = null
-        targetDom = "#field"
-    
-        # size of the diagram
-        viewerWidth = $(targetDom).width()
-        viewerHeight = viewerWidth
-    
-        tree = d3.layout.cluster()
-            .size([360, viewerHeight / 2 - 120])
-    
-        # define a d3 diagonal projection for use by the node paths later on.
-        diagonal = d3.svg.diagonal.radial()
-            .projection((d) ->
-                return [d.y, d.x / 180 * Math.PI]
-            )
-    
-        # A recursive helper function for performing some setup by walking through all nodes
-    
-        visit = (parent, visitFn, childrenFn) ->
-            if !parent 
-                return
-    
-            visitFn(parent)
-    
-            children = childrenFn(parent)
-            if children
-                for child, i in children
-                    visit(child, visitFn, childrenFn)
-    
-        # Call visit function to establish maxLabelLength
-        visit(treeData, 
-            (d) ->
-                totalNodes++
-                maxLabelLength = Math.max(d.name.length, maxLabelLength)
-            (d) ->
-                return if d.children and d.children.length > 0 then d.children else null
-        )
-    
-    
-        # sort the tree according to the node names
-    
-        sortTree = -> 
-            tree.sort((a, b) ->
-                return if b.name.toLowerCase() < a.name.toLowerCase() then 1 else -1
-            )
-        # Sort the tree initially incase the JSON isn't in a sorted order.
-        sortTree()
-    
-        # TODO: Pan function, can be better implemented.
-        ### 
-        pan = (domNode, direction) ->
-            speed = panSpeed
-            if panTimer
-                clearTimeout(panTimer)
-                translateCoords = d3.transform(svgGroup.attr("transform"))
-                if direction == 'left' or direction == 'right'
-                    translateX = if direction == 'left' then translateCoords.translate[0] + speed else translateCoords.translate[0] - speed
-                    translateY = translateCoords.translate[1]
-                else if direction == 'up' or direction == 'down'
-                    translateX = translateCoords.translate[0]
-                    translateY = if direction == 'up' then translateCoords.translate[1] + speed else translateCoords.translate[1] - speed
-                
-                scaleX = translateCoords.scale[0]
-                scaleY = translateCoords.scale[1]
-                scale = zoomListener.scale()
-                svgGroup.transition().attr("transform", "translate(" + translateX + "," + translateY + ")scale(" + scale + ")")
-                d3.select(domNode).select('g.node').attr("transform", "translate(" + translateX + "," + translateY + ")")
-                zoomListener.scale(zoomListener.scale())
-                zoomListener.translate([translateX, translateY])
-                panTimer = setTimeout( ->
-                    pan(domNode, speed, direction)
-                50)
-    
-        # Define the zoom function for the zoomable tree
-    
-        zoom = -> 
-            svgGroup.attr("transform", "translate(" + d3.event.translate + ")scale(" + d3.event.scale + ")")
-    
-        # define the zoomListener which calls the zoom function on the "zoom" event constrained within the scaleExtents
-        zoomListener = d3.behavior.zoom().scaleExtent([0.1, 3]).on("zoom", zoom)
-        ###
-        initiateDrag = (d, domNode) ->
-            draggingNode = d
-            d3.select(domNode).select('.ghostCircle').attr('pointer-events', 'none')
-            d3.selectAll('.ghostCircle').attr('class', 'ghostCircle show')
-            d3.select(domNode).attr('class', 'node activeDrag')
-            svgGroup.selectAll("g.node").sort((a, b) -> # select the parent and sort the path's
-                if a.id != draggingNode.id
-                    return 1 # a is not the hovered element, send "a" to the back
-                else
-                    return -1 # a is the hovered element, bring "a" to the front
-            )
+    class Cluster
+        # constant
+        @DURATION = 100
+        @CHILD_WIDTH = 15
+        @PARENT_WIDTH = 300
+        @LIST_WIDTH = 200
+        @LIST_MARGIN = 20
 
-            # if nodes has children, remove the links and nodes
-            if nodes.length > 1
-                # remove link paths
-                links = tree.links(nodes)
-                nodePaths = svgGroup.selectAll("path.link")
-                    .data(links, (d) ->
-                        return d.target.id
-                    ).remove()
-                # remove child nodes
-                nodesExit = svgGroup.selectAll("g.node")
-                    .data(nodes, (d) ->
-                        return d.id
-                    ).filter((d, i) ->
-                        if d.id == draggingNode.id
-                            return false
-                        return true
-                    ).remove()
+        constructor: (target, root, width, height) ->
+            that = @
+            @selectedNode = null
+            @draggingNode = null
+            @root = root
+            @index = 1
 
-            # remove parent link
-            parentLink = tree.links(tree.nodes(draggingNode.parent))
-            svgGroup.selectAll('path.link').filter((d, i) ->
-                if d.target.id == draggingNode.id
-                    return true
-                return false
-            ).remove()
-    
-            dragStarted = null
-    
-        # define the baseSvg, attaching a class for styling and the zoomListener
-        baseSvg = d3.select(targetDom).append("svg")
-            .attr("width", viewerWidth)
-            .attr("height", viewerHeight)
-            .attr("class", "overlay")
-            #.call(zoomListener)
- 
+            baseSvg = d3.select(target).append("svg")
+                .attr("width", width)
+                .attr("height", height)
+                .attr("class", "overlay")
+
+            @svgGroup = baseSvg.append("g")
+                .attr("width", width)
+                .attr("height", height)
+
+            @svgGroup.append("rect")
+                .attr("width", width)
+                .attr("height", height)
+                .attr("opacity", 0)
+                .on("dblclick", @createParent())
+
+            @root.x = 0
+            @root.y = 0
+            @root.width = width - (Cluster.LIST_WIDTH + Cluster.LIST_MARGIN)
+            @root.height = height
+            @initlayout()
+
+        parents: () ->
+            return @root.children.filter((d) -> !d.orphan)
+
+        orphan: () ->
+            return @root.children.filter((d) -> d.orphan)[0]
+
+        createParent: () ->
+            that = @
+            return (d) ->
+                console.log()
+                xy = d3.mouse(@)
+                console.log(xy)
+                that.root.children.push(
+                    {x: xy[0], y: xy[1], children: [],
+                    width: Cluster.PARENT_WIDTH, height: Cluster.PARENT_WIDTH})
+                that.justupdate()
+
+
         # Define the drag listeners for drag/drop behaviour of nodes.
-        dragListener = d3.behavior.drag()
+        parentDragListener: ->
+            that = @
+            return d3.behavior.drag()
             .on("dragstart", (d) ->
-                if d == root
-                    return
-                dragStarted = true
-                nodes = tree.nodes(d)
+                d.x0 = d.x
+                d.y0 = d.y
                 d3.event.sourceEvent.stopPropagation()
-                # it's important that we suppress the mouseover event on the node being dragged. Otherwise it will absorb the mouseover event and the underlying node will not detect it d3.select(this).attr('pointer-events', 'none')
+                if !d.children
+                    that.draggingNode = d
+                    that.sort()
+                else
+                    that.svgGroup.selectAll("g.node rect")
+                        .filter((c) -> d.children.indexOf(c) > -1)
+                        .each((c) ->
+                            c.x0 = c.x
+                            c.y0 = c.y
+                        )
             )
             .on("drag", (d) ->
-                if d == root 
-                    return
-                if dragStarted
-                    domNode = this
-                    initiateDrag(d, domNode)
-
-                # get coords of mouseEvent relative to svg container to allow for panning
-                ###
-                relCoords = d3.mouse($('svg').get(0))
-                if relCoords[0] < panBoundary
-                    panTimer = true
-                    pan(this, 'left')
-                else if relCoords[0] > ($('svg').width() - panBoundary)
-                    panTimer = true
-                    pan(this, 'right')
-                else if relCoords[1] < panBoundary
-                    panTimer = true
-                    pan(this, 'up')
-                else if relCoords[1] > ($('svg').height() - panBoundary)
-                    panTimer = true
-                    pan(this, 'down')
-                else
-                    try
-                        clearTimeout(panTimer)
-                    catch e
-                        pass
-                ###
                 d.x0 += d3.event.dx
                 d.y0 += d3.event.dy
-                node = d3.select(this)
-                node.attr("transform", "translate(" + d.x0 + "," + d.y0 + ")")
-                #updateTempConnector()
+                d3.select(@)
+                    .attr("transform", (c) -> trans(c.x0, c.y0))
+                that.svgGroup.selectAll("g.node rect.resizehandle")
+                    .filter((c) -> c is d)
+                    .attr("transform", (c) -> trans(c.x0 + c.width, c.y0 + c.height))
+
+                if d.children
+                    that.svgGroup.selectAll("g.child")
+                        .filter((c) -> d.children.indexOf(c) > -1)
+                        .each((c) ->
+                            c.x0 += d3.event.dx
+                            c.y0 += d3.event.dy
+                        )
+                        .attr("transform", (c) -> trans(c.x0, c.y0))
+
             ).on("dragend", (d) ->
-                if d == root
-                    return
-                domNode = this
-                if selectedNode
-                    # now remove the element from the parent, and insert it into the new elements children
-                    index = draggingNode.parent.children.indexOf(draggingNode)
+                if that.selectedNode
+                    console.log(that.selectedNode)
+                    index = that.draggingNode.parent.children.indexOf(that.draggingNode)
                     if index > -1
-                        draggingNode.parent.children.splice(index, 1)
-                    if typeof selectedNode.children isnt 'undefined' or typeof selectedNode._children isnt 'undefined'
-                        if typeof selectedNode.children isnt 'undefined'
-                            selectedNode.children.push(draggingNode)
-                        else
-                            selectedNode._children.push(draggingNode)
+                        that.draggingNode.parent.children.splice(index, 1)
+                    if typeof that.selectedNode.children isnt 'undefined'
+                        that.selectedNode.children.push(that.draggingNode)
                     else
-                        selectedNode.children = []
-                        selectedNode.children.push(draggingNode)
-                    # Make sure that the node being added to is expanded so user can see added node is correctly moved
-                    expand(selectedNode)
-                    sortTree()
-                    endDrag()
+                        that.selectedNode.children = []
+                        that.selectedNode.children.push(that.draggingNode)
+                    that.childupdate([that.draggingNode.parent, that.selectedNode])
+                    that.selectedNode = null
                 else
-                    endDrag()
-            )
-        endDrag = -> 
-            selectedNode = null
-            d3.selectAll('.ghostCircle').attr('class', 'ghostCircle')
-            d3.select(domNode).attr('class', 'node')
-            # now restore the mouseover event or we won't be able to drag a 2nd time
-            d3.select(domNode).select('.ghostCircle').attr('pointer-events', '')
-            #updateTempConnector()
-            if draggingNode isnt null
-                update(root)
-                # disabled by kato
-                #centerNode(draggingNode)
-                draggingNode = null
-    
-        # Helper functions for collapsing and expanding nodes.
-        collapse = (d) ->
-            if d.children
-                d._children = d.children
-                d._children.forEach(collapse)
-                d.children = null
-    
-        expand = (d) ->
-            if d._children
-                d.children = d._children
-                d.children.forEach(expand)
-                d._children = null
-    
-        # Function to update the temporary connector indicating dragging affiliation
-        updateTempConnector = () ->
-            data = []
-            if draggingNode isnt null and selectedNode isnt null
-                data = [{x: selectedNode.x, y: selectedNode.y}]
-            selectedNodes = svgGroup.selectAll("g.selected")
-                .data(data)
-            enterSelectedNodes = selectedNodes.enter().append("g")
-                .attr('class', 'selected')
-                .attr("transform", (d) ->
-                    return "rotate(" + (d.x - 90) + ")translate(" + d.y + ")"
-                )
-            enterSelectedNodes.append('circle')
-                .attr('class', '')
-                .attr("r", 30)
-                .attr("opacity", 1)
+                    if d.children
+                        d.x = d.x0
+                        d.y = d.y0
+                        that.svgGroup.selectAll("g.node")
+                            .filter((c) -> d.children.indexOf(c) > -1)
+                            .each((c) -> 
+                                c.x = c.x0
+                                c.y = c.y0
+                            )
+                    else
+                        d3.select(@).attr("transform", (c) -> trans(c.x, c.y))
 
-            selectedNodes.exit().remove()
-            svgGroup.selectAll("g").sort((a, b) -> # select the parent and sort the path's
-                if !a.name
-                    return 1 # a is not the hovered element, send "a" to the back
-                else
-                    return -1 # a is the hovered element, bring "a" to the front
+                that.draggingNode = null
+                that.sort()
             )
 
-            ###
-            data = []
-            if draggingNode isnt null and selectedNode isnt null
-                # have to flip the source coordinates since we did this for the existing connectors on the original tree
-                data = [{
-                    source: {
-                        x: selectedNode.y0,
-                        y: selectedNode.x0
-                    },
-                    target: {
-                        x: draggingNode.y0,
-                        y: draggingNode.x0
-                    }
-                }]
-            link = svgGroup.selectAll(".templink").data(data)
-            link.enter().append("path")
-                .attr("class", "templink")
-                .attr("d", d3.svg.diagonal())
-                .attr('pointer-events', 'none')
-            link.attr("d", d3.svg.diagonal())
-            link.exit().remove()
-            ###
-    
-        ###
-        # Function to center node when clicked/dropped so node doesn't get lost when collapsing/moving with large amount of children.
-        centerNode = (source) ->
-            scale = zoomListener.scale()
-            x = -source.y0
-            y = -source.x0
-            x = x * scale + viewerWidth / 2
-            y = y * scale + viewerHeight / 2
-            d3.select('g').transition()
-                .duration(duration)
-                .attr("transform", "translate(" + x + "," + y + ")scale(" + scale + ")")
-            zoomListener.scale(scale)
-            zoomListener.translate([x, y])
-        ###
-        
-        # Toggle children function
-        toggleChildren = (d) ->
-            if d.children
-                d._children = d.children
-                d.children = null
-            else if d._children
-                d.children = d._children
-                d._children = null
-            return d
-    
-        # Toggle children on click.
-        click = (d) ->
-            if d3.event.defaultPrevented 
-                return # click suppressed
-            d = toggleChildren(d)
-            update(d)
+        sort: ->
+            that = @
+            @svgGroup.selectAll("g").sort((a, b) ->
+                if a is that.draggingNode
+                    return -1
+                else if b is that.draggingNode
+                    return 1
+                else if a.children
+                    return -1
+                else if b.children
+                    return 1
+                else if a.id < b.id
+                    return -1
+                else
+                    return 1
+            )
 
-        update = (source) ->
-            # Compute the new tree layout.
-            nodes = tree.nodes(root) #.reverse()
-            links = tree.links(nodes)
-    
+        resizeDragListener: ->
+            that = @
+            return d3.behavior.drag()
+            .on("dragstart", (d) ->
+                d3.event.sourceEvent.stopPropagation()
+            )
+            .on("drag", (d) ->
+                d.width += d3.event.dx
+                d.height += d3.event.dy
+                d3.select(@).attr("transform", (c) -> 
+                    trans(c.x + c.width, c.y + c.height))
+                that.svgGroup.selectAll("g.parent rect.parentrect")
+                    .filter((c) -> c is d)
+                    .attr("width", (c) -> c.width)
+                    .attr("height", (c) -> c.height)
+            )
+            .on("dragend", (d) ->
+                that.childupdate([d])
+            )
+
+        treegrid: () ->
+            that = @
+            grid = d3.layout.grid()
+                .bands()
+                .size([@root.width, @root.height])
+            nodes = grid(@parents())
+            nodes.forEach((d) ->
+                d.width = d.width or Cluster.PARENT_WIDTH
+                d.height = d.height or d.width
+            )
+            # orphan
+            orphan = @orphan()
+            orphan.width = Cluster.LIST_WIDTH
+            orphan.height = @root.height
+            orphan.x = @root.width + Cluster.LIST_MARGIN
+            orphan.y = 0
+            nodes.push(orphan)
+            # children
+            @root.children.forEach((d) ->
+                if d.children
+                    children = that.childgrid(d)
+                    nodes = nodes.concat(children)
+            )
+            return nodes
+
+        childgrid: (parent) ->
+            cols = Math.max(1, Math.min(
+                Math.floor((parent.width - 20) / (Cluster.CHILD_WIDTH * 8 + 20)),
+                parent.children.length
+            ))
+            childgrid = d3.layout.grid()
+                .bands()
+                .cols(cols)
+                .size([parent.width, parent.height])
+                .padding([20, 20])
+                .nodeSize([Cluster.CHILD_WIDTH * 8, Cluster.CHILD_WIDTH * 3])
+            children = childgrid(parent.children)
+            children.forEach((c) ->
+                c.x += parent.x
+                c.y += parent.y
+                c.width = Cluster.CHILD_WIDTH * 8
+                c.height = Cluster.CHILD_WIDTH * 3
+                c.parent = parent
+            )
+            return children
+
+        initlayout: () ->
+            nodes = @treegrid()
+            @update(nodes)
+
+        childupdate: (parents) ->
+            that = @
+            nodes = @root.children
+            @root.children.forEach((d) ->
+                if parents.indexOf(d) > -1
+                    children = that.childgrid(d)
+                    nodes = nodes.concat(children)
+                else
+                    nodes = nodes.concat(d.children)
+            )
+            @update(nodes)
+
+        justupdate: () ->
+            that = @
+            nodes = @root.children
+            @root.children.forEach((d) ->
+                nodes = nodes.concat(d.children)
+            )
+            @update(nodes)
+
+        update: (data) ->
+            that = @
             # Update the nodes…
-            node = svgGroup.selectAll("g.node")
-                .data(nodes, (d) ->
-                    return d.id or (d.id = ++i)
+            node = @svgGroup.selectAll("g.node")
+                .data(data, (d) ->
+                    return d.id or (d.id = that.index++)
                 )
-    
-            # Enter any new nodes at the parent's previous position.
-            nodeEnter = node.enter().append("g")
-                .call(dragListener)
-                .attr("class", "node")
-                .attr("transform", (d) ->
-                    return "rotate(" + (d.x - 90) + ")translate(" + d.y + ")"
-                )
-                .on('click', click)
-    
-            nodeEnter.append("circle")
-                .attr('class', 'nodeCircle')
-                .attr("r", 0)
-                .style("fill", (d) ->
-                    return if d._children then "lightsteelblue" else "#fff"
-                )
-    
-            nodeEnter.append("text")
-                .attr("x", (d) ->
-                    return if d.children or d._children then -10 else 10
-                )
-                .attr("dy", ".35em")
-                .attr('class', 'nodeText')
-                .attr("text-anchor", (d) ->
-                    return if d.children or d._children then "end" else "start"
-                )
-                .text((d) ->
-                    return d.name
-                )
-                .style("fill-opacity", 0)
 
-            # phantom node to give us mouseover in a radius around it
-            nodeEnter.append("circle")
-                .attr('class', 'ghostCircle')
-                .attr("r", 30)
-                .attr("opacity", 0) # change this to zero to hide the target area
-                .attr('pointer-events', 'mouseover')
+            # enter any new nodes at the parent's previous position.
+            nodeenter = node.enter().append("g")
+                .attr("class", "node")
+
+            parentrects = nodeenter
+                .filter((d) -> d.children)
+                .attr('class', 'node parent')
+                .append("rect")
+                .attr('class', 'parentrect')
+                .style("fill", "#fff")
+                .style("opacity", "0.5")
+                .attr("width", (d) -> d.width)
+                .attr("height", (d) -> d.height)
+                .attr("transform", (d) -> trans(d.x, d.y))
                 .on("mouseover", (d) ->
-                    selectedNode = d
-                    console.log(d)
-                    d3.select(this).attr("class", "ghostCircle show selected")
+                    if that.draggingNode
+                        that.selectedNode = d
                 )
                 .on("mouseout", (d) ->
-                    console.log(d)
-                    selectedNode = null
-                    d3.select(this).attr("class", "ghostCircle show")
+                    if that.draggingNode
+                        that.selectedNode = null
+                )
+            # non orphans
+            parentrects.filter((d) -> !d.orphan)
+                .attr('pointer-events', 'mouseover')
+                .call(@parentDragListener())
+            # orphans
+            parentrects.filter((d) -> d.orphan)
+                .attr('class', 'node parent orphan')
+
+            childgroups = nodeenter
+                .filter((d) -> !d.children)
+                .attr("class", "node child")
+                .attr("transform", (d) -> trans(d.x, d.y))
+                .attr('pointer-events', 'mouseover')
+                .attr('title', (d) -> d.name)
+                .call(@parentDragListener())
+            nodeenter
+                .filter((d) -> !d.children)
+                .append("rect")
+                .style("fill", "lightsteelblue")
+                .style("opacity", "0.5")
+                .attr("width", (d) -> d.width)
+                .attr("height", (d) -> d.height)
+            nodeenter
+                .filter((d) -> !d.children)
+                .append("text")
+                .each((d) ->
+                    d3.select(@).append("tspan")
+                        .text((d) -> d.name)
+                        .attr("x", 0)
+                        .attr("dy", 10)
+                    d3.select(@).append("tspan")
+                        .text((d) -> d.name)
+                        .attr("x", 0)
+                        .attr("dy", 20)
                 )
 
-            # Update the text to reflect whether node has children or not.
-            node.select('text')
-                .attr("x", (d) ->
-                    return if d.children or d._children then -10 else 10
-                )
-                .attr("text-anchor", (d) ->
-                    return if d.children or d._children then "end" else "start"
-                )
-                .text((d) ->
-                    return d.name
-                )
 
-            # Change the circle fill depending on whether it has children and is collapsed
-            node.select("circle.nodeCircle")
-                .attr("r", (d) ->
-                    return if d._children then 20 else 10
-                )
-                .style("fill", (d) ->
-                    return if d._children then "lightsteelblue" else "#fff"
-                )
+            # handle for resizing
+            handles = nodeenter.filter((d) -> d.children)
+                .append("rect")
+                .attr('class', 'resizehandle')
+                .style("fill", "black")
+                .style("opacity", "0.5")
+                .style("cursor", "nwse-resize")
+                .attr('pointer-events', 'mouseover')
+                .attr('width', 10)
+                .attr('height', 10)
+                .attr("transform", (d) -> trans(d.x + d.width, d.x + d.height))
+                .call(@resizeDragListener())
 
             # Transition nodes to their new position.
-            nodeUpdate = node.transition()
-                .duration(duration)
-                .attr("transform", (d) ->
-                    return "rotate(" + (d.x - 90) + ")translate(" + d.y + ")"
-                )
-
-            # Fade the text in
-            nodeUpdate.select("text")
-                .style("fill-opacity", 1)
+            @svgGroup.selectAll("g.parent rect.parentrect")
+                .attr("transform", (d) -> trans(d.x, d.y))
+            @svgGroup.selectAll("g.child")
+                .attr("transform", (d) -> trans(d.x, d.y))
+            @svgGroup.selectAll("g.node rect.resizehandle")
+                .attr("transform", (d) -> trans(d.x + d.width, d.y + d.height))
 
             # Transition exiting nodes to the parent's new position.
-            nodeExit = node.exit().transition()
-                .duration(duration)
-                .remove()
+            node.exit().remove()
 
-            nodeExit.select("circle")
-                .attr("r", 0)
+            @sort()
 
-            nodeExit.select("text")
-                .style("fill-opacity", 0)
+    d3.json("/projects/cluster_json", (error, treeData) ->
 
-            # Update the links…
-            link = svgGroup.selectAll("path.link")
-                .data(links, (d) ->
-                    return d.target.id
-                )
+        targetDom = "#field"
+        viewerWidth = $(targetDom).width()
+        viewerHeight = viewerWidth
 
-            # Enter any new links at the parent's previous position.
-            link.enter().insert("path", "g")
-                .attr("class", "link")
-                .attr("d", diagonal)
-
-            # Transition links to their new position.
-            link.transition()
-                .duration(duration)
-                .attr("d", diagonal)
-
-            # Transition exiting nodes to the parent's new position.
-            link.exit().transition()
-                .duration(duration)
-                #.attr("d", diagonal)
-                .remove()
-
-            # Stash the old positions for transition.
-            nodes.forEach((d) ->
-                d.x0 = Math.cos((d.x - 90) / 180 * Math.PI) * d.y
-                d.y0 = Math.sin((d.x - 90) / 180 * Math.PI) * d.y
-            )
-        # Append a group which holds all nodes and which the zoom Listener can act upon.
-        svgGroup = baseSvg.append("g")
-            .attr("transform", "translate(" + (viewerWidth / 2) + "," + (viewerHeight / 2) + ")")
-    
-        # Define the root
-        root = treeData
-        #root.x0 = 0
-        #root.y0 = 0
-    
-        # Layout the tree initially and center on the root node.
-        update(root)
-        #centerNode(root)
+        new Cluster(targetDom, treeData, viewerWidth, viewerHeight)
     )

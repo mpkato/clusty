@@ -6,7 +6,7 @@
   <div class="panel-heading">
     <h4><%=t '.title', :default => model_class.model_name.human.titleize %>: <%= @project.label %></h4>
   </div>
-  <div class="panel-body">
+  <div id="field" class="panel-body">
     <% @project.elements.each do |element| %>
       <div class="panel panel-default element">
         <div class="panel-body">

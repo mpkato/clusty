@@ -12,5 +12,6 @@
  *
  *= require_tree .
  *= require devise_bootstrap_views_less
+ *= require jquery-ui
  *= require_self
  */
