@@ -4,7 +4,8 @@ class ClustersController < ApplicationController
 
   # GET /clusters.json
   def index
-    @clusters = @project.clusters.includes(:elements)
+    @clusters = @project.clusters.to_a
+    @clusters << Cluster.new(elements: find_orphans)
   end
 
   # GET /clusters/1.json
@@ -24,10 +25,22 @@ class ClustersController < ApplicationController
 
   # PATCH/PUT /clusters/1.json
   def update
-    if @cluster.update(cluster_params)
+    if @cluster.id.nil? # orphans
       render :show, status: :ok, location: @cluster
     else
-      render json: @cluster.errors, status: :unprocessable_entity
+      case cluster_params[:method]
+      when 'create'
+        @cluster.elements << @project.elements.find(cluster_params[:element_id])
+        render :show, status: :ok, location: @cluster
+      when 'destroy'
+        @cluster.elements.delete(@project.elements.find(cluster_params[:element_id]))
+        render :show, status: :ok, location: @cluster
+      when 'update'
+        @cluster.update(name: cluster_params[:name])
+        render :show, status: :ok, location: @cluster
+      else
+        render json: @cluster.errors, status: :unprocessable_entity
+      end
     end
   end
 
@@ -41,17 +54,30 @@ class ClustersController < ApplicationController
 
     # Use callbacks to share common setup or constraints between actions.
     def set_project
-      @project = Project.includes(:clusters).find(params[:project_id])
+      @project = Project.includes([:elements, clusters: :elements]).find(params[:project_id])
     end
 
     # Use callbacks to share common setup or constraints between actions.
     def set_cluster
-      @cluster = Cluster.includes(:elements).find(params[:id])
+      if params[:id].to_i == -1
+        # orphans
+        @cluster = Cluster.new(elements: find_orphans)
+      else
+        @cluster = Cluster.includes(:elements).find(params[:id])
+      end
     end
 
     # Never trust parameters from the scary internet, only allow the white list through.
     def cluster_params
-      params.require(:cluster).permit(:name, :project_id)
+      params.require(:cluster).permit(:name, :project_id, :element_id, :method)
+    end
+    
+    # Find elements that do not belong to any cluster
+    def find_orphans
+      clustered_elements = Set.new()
+      @project.clusters.each {|c| c.elements.each {|e| clustered_elements << e}}
+      orphans = @project.elements.select {|e| not clustered_elements.include?(e)}
+      return orphans
     end
 end
 

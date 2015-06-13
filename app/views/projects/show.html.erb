@@ -1,19 +1,12 @@
 <%- model_class = Project -%>
 <div class="page-header">
-  <h1>Cluster</h1>
+  <h1><%= @project.label %></h1>
 </div>
 <div class="panel panel-default">
-  <div class="panel-heading">
-    <h4><%=t '.title', :default => model_class.model_name.human.titleize %>: <%= @project.label %></h4>
-  </div>
-  <div id="field" class="panel-body">
-    <% @project.elements.each do |element| %>
-      <div class="panel panel-default element">
-        <div class="panel-body">
-          <%= element.body %>
-        </div>
-      </div>
-    <% end %>
+  <div id="field" class="panel-body" 
+    data-id="<%= @project.id %>"
+    data-url="<%= project_clusters_path(@project) %>"
+  >
   </div>
 </div>
 
