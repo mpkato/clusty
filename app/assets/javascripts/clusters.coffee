@@ -35,11 +35,35 @@ $ ->
                     .attr("y", (++lineNumber * lineHeight + yoffset) + "em")
                     .text(word)
 
+    bestSize = (width, height, elemWidth, elemHeight, num) ->
+        maxlen = Math.min(width, height)
+        wcands = d3.range(1,
+            Math.floor((width - Cluster.NODE_PADDING) / (elemWidth + Cluster.NODE_PADDING))
+            ).map((d) -> d * (elemWidth + Cluster.NODE_PADDING))
+        hcands = d3.range(1,
+            Math.floor((height - Cluster.NODE_PADDING) / (elemHeight + Cluster.NODE_PADDING))
+            ).map((d) -> d * (elemHeight + Cluster.NODE_PADDING))
+        cands = wcands.concat(hcands).sort()
+        currentbest = null
+        cands.forEach((candsize) ->
+            if candsize <= maxlen
+                wnum = Math.floor((candsize - Cluster.NODE_PADDING) / (elemWidth + Cluster.NODE_PADDING))
+                hnum = Math.floor((candsize - Cluster.NODE_PADDING) / (elemHeight + Cluster.NODE_PADDING))
+                maxnum = wnum * hnum
+                if maxnum >= num and currentbest is null
+                    currentbest = candsize
+        )
+        if currentbest isnt null
+            return currentbest
+        else
+            return cands[-1]
+
     class Cluster
         # constant
         @DURATION = 100
         @CHILD_WIDTH = 15
         @PARENT_WIDTH = 300
+        @NODE_PADDING = 20
         @LIST_WIDTH = 200
         @LIST_MARGIN = 20
 
@@ -373,13 +397,23 @@ $ ->
 
         treegrid: () ->
             that = @
+            cols = Math.max(1, Math.min(
+                Math.floor((@root.width - Cluster.NODE_PADDING)\
+                    / (Cluster.CHILD_WIDTH * 8 + Cluster.NODE_PADDING)),
+                @parents().length
+            ))
             grid = d3.layout.grid()
                 .bands()
                 .size([@root.width, @root.height])
+                .padding([Cluster.NODE_PADDING, Cluster.NODE_PADDING])
+                .nodeSize([Cluster.CHILD_WIDTH * 8, Cluster.CHILD_WIDTH * 8])
+                .cols(cols)
             nodes = grid(@parents())
             nodes.forEach((d) ->
-                d.width = d.width or Cluster.PARENT_WIDTH
-                d.height = d.height or d.width
+                size = bestSize(that.root.width, that.root.height,
+                    Cluster.CHILD_WIDTH * 8, Cluster.CHILD_WIDTH * 3, d.elements.length)
+                d.width = size
+                d.height = size
             )
             # orphan
             orphan = @orphan()
@@ -398,14 +432,15 @@ $ ->
 
         childgrid: (parent) ->
             cols = Math.max(1, Math.min(
-                Math.floor((parent.width - 20) / (Cluster.CHILD_WIDTH * 8 + 20)),
+                Math.floor((parent.width - Cluster.NODE_PADDING)\
+                    / (Cluster.CHILD_WIDTH * 8 + Cluster.NODE_PADDING)),
                 parent.elements.length
             ))
             childgrid = d3.layout.grid()
                 .bands()
                 .cols(cols)
                 .size([parent.width, parent.height])
-                .padding([20, 20])
+                .padding([Cluster.NODE_PADDING, Cluster.NODE_PADDING])
                 .nodeSize([Cluster.CHILD_WIDTH * 8, Cluster.CHILD_WIDTH * 3])
             elements = childgrid(parent.elements)
             elements.forEach((c) ->
@@ -418,8 +453,13 @@ $ ->
             return elements
 
         initlayout: () ->
+            that = @
             nodes = @treegrid()
             @update(nodes)
+            @svgGroup.selectAll('g.parent')
+                .each((d) ->
+                    that.toggleSize(d)
+                )
 
         childupdate: (parent_ids) ->
             that = @
