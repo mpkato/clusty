@@ -14,7 +14,7 @@ $ ->
         yoffset = 0.1
         maxlinenum = 4
 
-        words = text.split(/\s+/).reverse()
+        words = text.split('').reverse()
         word = null
         line = []
         lineNumber = 0
@@ -23,10 +23,10 @@ $ ->
             .attr("y", (++lineNumber * lineHeight + yoffset) + "em")
         while word = words.pop()
             line.push(word)
-            tspan.text(line.join(" "))
-            if tspan.node().getComputedTextLength() > width
+            tspan.text(line.join(""))
+            if tspan.node().getComputedTextLength() > width - xoffset
                 line.pop()
-                tspan.text(line.join(" "))
+                tspan.text(line.join(""))
                 if lineNumber >= maxlinenum
                     break
                 line = [word]
@@ -65,10 +65,7 @@ $ ->
                 .attr("width", width)
                 .attr("height", height)
                 .attr("opacity", 0)
-                .on("contextmenu", (d) ->
-                    that.createParent(d, @)
-                    d3.event.preventDefault()
-                )
+                .on("contextmenu", d3.contextMenu(that.globalmenu()))
 
             @root.x = 0
             @root.y = 0
@@ -83,6 +80,32 @@ $ ->
 
         orphan: () ->
             return @root.filter((d) -> d.id is null)[0]
+
+        globalmenu: () ->
+            that = @
+            return [
+                    {
+                        title: 'Create Cluster',
+                        action: (elm, d, i) ->
+                            that.createParent(d, elm)
+                    }
+                ]
+
+        localmenu: () ->
+            that = @
+            return [
+                    {
+                        title: 'Label Cluster',
+                        action: (elm, d, i) ->
+                            that.labelbox(d, elm)
+                    },
+                    {
+                        title: (d) -> return if d.elements.length == 0 then 'Delete Cluster' else '',
+                        action: (elm, d, i) ->
+                            if d.elements.length == 0
+                                that.destroyParent(d)
+                    }
+                ]
 
         createParent: (d, there) ->
             that = @
@@ -119,9 +142,13 @@ $ ->
 
         toggleSize: (d) ->
             that = @
+            parent = that.svgGroup.selectAll("g.parent") 
+                .filter((c) -> d.id == c.id)
             if d.min is undefined
                 that.svgGroup.selectAll("g.child")
                     .filter((c) -> d.id == c.parent.id)
+                    .style("display", "none")
+                parent.select("rect.resizehandle")
                     .style("display", "none")
                 d.width0 = d.width
                 d.height0 = d.height
@@ -132,21 +159,21 @@ $ ->
                 that.svgGroup.selectAll("g.child")
                     .filter((c) -> d.id == c.parent.id)
                     .style("display", "")
+                parent.select("rect.resizehandle")
+                    .style("display", "")
                 d.width = d.width0
                 d.height = d.height0
                 delete d.width0
                 delete d.height0
                 delete d.min
-            parent = that.svgGroup.selectAll("g.parent") 
-                .filter((c) -> d.id == c.id)
             parent.select("rect.parentrect")
                 .attr("width", (c) -> c.width)
                 .attr("height", (c) -> c.height)
                 .style("fill", if d.min is undefined then "#fff" else that.color(d.id))
             parent.select("rect.resizehandle")
-                .attr("transform", (c) -> trans(c.x0 + c.width, c.y0 + c.height))
+                .attr("transform", (c) -> trans(c.x + c.width, c.y + c.height))
             parent.select("text.clustername")
-                .attr("transform", (c) -> trans(c.x0 + c.width / 2, c.y0 + c.height / 2))
+                .attr("transform", (c) -> trans(c.x + c.width / 2, c.y + c.height / 2))
 
         labelbox: (d, there) ->
             that = @
@@ -334,11 +361,14 @@ $ ->
                     .filter((c) -> c.id == d.id)
                     .attr("width", (c) -> c.width)
                     .attr("height", (c) -> c.height)
+                that.svgGroup.selectAll("text.clustername")
+                    .filter((c) -> c.id == d.id)
+                    .attr("transform", (c) -> trans(c.x + c.width / 2, c.y + c.height / 2))
             )
             .on("dragend", (d) ->
                 if d.min # minimized
                     return
-                that.childupdate([d.id])
+                that.simplechildupdate([d.id])
             )
 
         treegrid: () ->
@@ -407,6 +437,16 @@ $ ->
                     )
                     that.update(nodes)
             )
+
+        simplechildupdate: (parent_ids) ->
+            that = @
+            nodes = []
+            that.root.forEach((d) ->
+                nodes.push(d)
+                elements = if parent_ids.indexOf(d.id) > -1 then that.childgrid(d) else d.elements
+                nodes = nodes.concat(elements)
+            )
+            that.update(nodes)
 
         justupdate: () ->
             that = @
@@ -493,13 +533,12 @@ $ ->
             # non orphans
             parentrects.filter((d) -> d.id isnt null)
                 .attr('pointer-events', 'mouseover')
-                .on("contextmenu", (d) ->
-                    if d.elements.length > 0
-                        that.labelbox(d, @)
-                    else
-                        that.destroyParent(d)
-                    d3.event.preventDefault()
-                )
+                .on("contextmenu", d3.contextMenu(that.localmenu(), (d) ->
+                    if d.min isnt undefined
+                        that.toggleSize(d)
+                        d3.event.preventDefault()
+                        return false
+                ))
                 .call(@parentDragListener())
             # orphans
             parentrects.filter((d) -> d.id is null)
@@ -558,6 +597,12 @@ $ ->
                 .attr("transform", (d) -> trans(d.x, d.y))
             @svgGroup.selectAll("g.child")
                 .attr("transform", (d) -> trans(d.x, d.y))
+            @svgGroup.selectAll("g.child")
+                .filter((d) -> d.parent.min isnt undefined)
+                .style("display", "none")
+            @svgGroup.selectAll("g.child")
+                .filter((d) -> d.parent.min is undefined)
+                .style("display", "")
             @svgGroup.selectAll("g.node rect.resizehandle")
                 .attr("transform", (d) -> trans(d.x + d.width, d.y + d.height))
 
