@@ -7,6 +7,34 @@ $ ->
     trans = (x, y) ->
         return "translate(#{x}, #{y})"
 
+    wrap = (there, text, width) ->
+        # const
+        lineHeight = 1.0
+        xoffset = 2
+        yoffset = 0.1
+        maxlinenum = 4
+
+        words = text.split(/\s+/).reverse()
+        word = null
+        line = []
+        lineNumber = 0
+        y = d3.select(there).attr("y")
+        tspan = d3.select(there).append("tspan").attr("x", xoffset + "px")
+            .attr("y", (++lineNumber * lineHeight + yoffset) + "em")
+        while word = words.pop()
+            line.push(word)
+            tspan.text(line.join(" "))
+            if tspan.node().getComputedTextLength() > width
+                line.pop()
+                tspan.text(line.join(" "))
+                if lineNumber >= maxlinenum
+                    break
+                line = [word]
+                tspan = d3.select(there)
+                    .append("tspan").attr("x", xoffset + "px")
+                    .attr("y", (++lineNumber * lineHeight + yoffset) + "em")
+                    .text(word)
+
     class Cluster
         # constant
         @DURATION = 100
@@ -46,6 +74,8 @@ $ ->
             @root.y = 0
             @root.width = width - (Cluster.LIST_WIDTH + Cluster.LIST_MARGIN)
             @root.height = height
+            @maxwidth = width - Cluster.CHILD_WIDTH * 8
+            @maxheight = height - Cluster.CHILD_WIDTH * 3
             @initlayout()
 
         parents: () ->
@@ -115,7 +145,7 @@ $ ->
                 .style("fill", if d.min is undefined then "#fff" else that.color(d.id))
             parent.select("rect.resizehandle")
                 .attr("transform", (c) -> trans(c.x0 + c.width, c.y0 + c.height))
-            parent.select("text")
+            parent.select("text.clustername")
                 .attr("transform", (c) -> trans(c.x0 + c.width / 2, c.y0 + c.height / 2))
 
         labelbox: (d, there) ->
@@ -130,8 +160,9 @@ $ ->
                 .html("""
                     <input type='text' id='labeltext' 
                     placeholder='Input label of this cluster ...'
-                    style='width: 100%'></input>""")
+                    style='width: 100%' onblur="$(this).closest('g').remove()"></input>""")
                 .on("focusout", (c) ->
+                    console.log(c)
                     try
                         obj.remove()
                     catch
@@ -162,7 +193,7 @@ $ ->
                             console.warn(err)
                             return
                         d.name = JSON.parse(data.response).name
-                        d3.select(there.parentNode).select("text")
+                        d3.select(there.parentNode).select("text.clustername")
                             .text(d.name)
                 )
 
@@ -219,10 +250,10 @@ $ ->
                     dx = -d.x0
                 if d.y0 + dy < 0
                     dy = -d.y0
-                if d.x0 + dx > that.root.width - d.width
-                    dx = that.root.width - d.width - d.x0
-                if d.y0 + dy > that.root.height - d.height
-                    dy = that.root.height - d.height - d.y0
+                if d.x0 + dx > that.maxwidth
+                    dx = that.maxwidth - d.x0
+                if d.y0 + dy > that.maxheight
+                    dy = that.maxheight - d.y0
                 d.x0 += dx
                 d.y0 += dy
 
@@ -231,7 +262,7 @@ $ ->
                 that.svgGroup.selectAll("g.node rect.resizehandle")
                     .filter((c) -> c is d)
                     .attr("transform", (c) -> trans(c.x0 + c.width, c.y0 + c.height))
-                that.svgGroup.selectAll("g.node text")
+                that.svgGroup.selectAll("g.node text.clustername")
                     .filter((c) -> c is d)
                     .attr("transform", (c) -> trans(c.x0 + c.width / 2, c.y0 + c.height / 2))
 
@@ -492,14 +523,7 @@ $ ->
                 .filter((d) -> !d.elements)
                 .append("text")
                 .each((d) ->
-                    d3.select(@).append("tspan")
-                        .text((d) -> d.body)
-                        .attr("x", 0)
-                        .attr("dy", 10)
-                    d3.select(@).append("tspan")
-                        .text((d) -> d.body)
-                        .attr("x", 0)
-                        .attr("dy", 20)
+                    wrap(@, d.body, d.width, d.height)
                 )
 
             # handle for resizing
@@ -522,6 +546,7 @@ $ ->
             # Cluster names
             nodeenter.filter((d) -> d.elements)
                 .append("text")
+                .attr("class", "clustername")
                 .text((d) -> d.name)
                 .style("opacity", "0.5")
                 .style("text-anchor", "middle")
