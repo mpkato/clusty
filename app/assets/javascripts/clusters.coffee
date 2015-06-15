@@ -457,6 +457,7 @@ $ ->
             nodes = @treegrid()
             @update(nodes)
             @svgGroup.selectAll('g.parent')
+                .filter((d) -> d.id isnt null)
                 .each((d) ->
                     that.toggleSize(d)
                 )
