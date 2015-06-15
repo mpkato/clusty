@@ -653,8 +653,9 @@ $ ->
             @sort()
     $(document).on 'page:change', ->
         targetDom = "#field"
-        viewerWidth = $(targetDom).width()
-        viewerHeight = viewerWidth
-        d3.json($(targetDom).data("url"), (error, treeData) ->
-            new Cluster(targetDom, treeData, viewerWidth, viewerHeight)
-        )
+        if $(targetDom).length != 0
+            viewerWidth = $(targetDom).width()
+            viewerHeight = viewerWidth
+            d3.json($(targetDom).data("url"), (error, treeData) ->
+                new Cluster(targetDom, treeData, viewerWidth, viewerHeight)
+            )
