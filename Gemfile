@@ -75,3 +75,6 @@ end
 group :production do
   gem 'mysql2'
 end
+
+# speed up JSON
+gem 'yajl-ruby'
