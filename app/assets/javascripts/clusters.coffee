@@ -36,27 +36,30 @@ $ ->
                     .text(word)
 
     bestSize = (width, height, elemWidth, elemHeight, num) ->
+        if num == 0
+            num = 1
         maxlen = Math.min(width, height)
         wcands = d3.range(1,
             Math.floor((width - Cluster.NODE_PADDING) / (elemWidth + Cluster.NODE_PADDING))
             ).map((d) -> d * (elemWidth + Cluster.NODE_PADDING))
+            .filter((d) -> d <= maxlen)
         hcands = d3.range(1,
             Math.floor((height - Cluster.NODE_PADDING) / (elemHeight + Cluster.NODE_PADDING))
             ).map((d) -> d * (elemHeight + Cluster.NODE_PADDING))
-        cands = wcands.concat(hcands).sort()
+            .filter((d) -> d <= maxlen)
+        cands = wcands.concat(hcands).sort((a, b) -> return a - b)
         currentbest = null
         cands.forEach((candsize) ->
-            if candsize <= maxlen
-                wnum = Math.floor((candsize - Cluster.NODE_PADDING) / (elemWidth + Cluster.NODE_PADDING))
-                hnum = Math.floor((candsize - Cluster.NODE_PADDING) / (elemHeight + Cluster.NODE_PADDING))
-                maxnum = wnum * hnum
-                if maxnum >= num and currentbest is null
-                    currentbest = candsize
+            wnum = Math.floor((candsize - Cluster.NODE_PADDING) / (elemWidth + Cluster.NODE_PADDING))
+            hnum = Math.floor((candsize - Cluster.NODE_PADDING) / (elemHeight + Cluster.NODE_PADDING))
+            maxnum = wnum * hnum
+            if maxnum >= num and currentbest is null
+                currentbest = candsize
         )
         if currentbest isnt null
             return currentbest
         else
-            return cands[-1]
+            return cands[cands.length - 1]
 
     class Cluster
         # constant
@@ -213,7 +216,6 @@ $ ->
                     placeholder='Input label of this cluster ...'
                     style='width: 100%' onblur="$(this).closest('g').remove()"></input>""")
                 .on("focusout", (c) ->
-                    console.log(c)
                     try
                         obj.remove()
                     catch
@@ -421,7 +423,7 @@ $ ->
                 .cols(cols)
             nodes = grid(@parents())
             nodes.forEach((d) ->
-                size = bestSize(that.root.width, that.root.height,
+                size = bestSize(that.root.width - (Cluster.LIST_WIDTH + Cluster.LIST_MARGIN), that.root.height,
                     Cluster.CHILD_WIDTH * 8, Cluster.CHILD_WIDTH * 3, d.elements.length)
                 d.width = size
                 d.height = size
