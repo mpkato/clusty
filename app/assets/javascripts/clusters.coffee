@@ -3,6 +3,12 @@ $ ->
         return @each(() ->
             @parentNode.appendChild(@)
         )
+    d3.selection.prototype.moveToBack = () ->
+        return @each(() ->
+            firstChild = @parentNode.firstChild
+            if firstChild
+                @parentNode.insertBefore(@, firstChild)
+        )
 
     trans = (x, y) ->
         return "translate(#{x}, #{y})"
@@ -98,8 +104,8 @@ $ ->
             @root.y = 0
             @root.width = width - (Cluster.LIST_WIDTH + Cluster.LIST_MARGIN)
             @root.height = height
-            @maxwidth = width - Cluster.CHILD_WIDTH * 8
-            @maxheight = height - Cluster.CHILD_WIDTH * 3
+            @maxwidth = width
+            @maxheight = height
             @initlayout()
 
         parents: () ->
@@ -248,6 +254,7 @@ $ ->
                         d.name = JSON.parse(data.response).name
                         d3.select(there.parentNode).select("text.clustername")
                             .text(d.name)
+                            .moveToBack()
                 )
 
         updateParent: (draggingNode, selectedNode) ->
@@ -314,10 +321,11 @@ $ ->
                     dx = -d.x0
                 if d.y0 + dy < 0
                     dy = -d.y0
-                if d.x0 + dx > that.maxwidth
-                    dx = that.maxwidth - d.x0
-                if d.y0 + dy > that.maxheight
-                    dy = that.maxheight - d.y0
+                parentextra = if d.elements then (Cluster.LIST_WIDTH + Cluster.LIST_MARGIN) else 0
+                if d.x0 + dx > that.maxwidth - d.width - parentextra
+                    dx = that.maxwidth - d.x0 - d.width - parentextra
+                if d.y0 + dy > that.maxheight - d.height
+                    dy = that.maxheight - d.y0 - d.height
                 d.x0 += dx
                 d.y0 += dy
 
@@ -340,9 +348,8 @@ $ ->
                         .attr("transform", (c) -> trans(c.x0, c.y0))
 
             ).on("dragend", (d) ->
-                if that.selectedNode and that.selectedNode isnt that.draggingNode.parent
+                if (that.draggingNode isnt null and that.selectedNode and that.selectedNode isnt that.draggingNode.parent)
                     that.updateParent(that.draggingNode, that.selectedNode)
-                    that.selectedNode = null
                 else
                     if d.elements
                         d.x = d.x0
@@ -355,8 +362,8 @@ $ ->
                             )
                     else
                         d3.select(@).attr("transform", (c) -> trans(c.x, c.y))
-
                 that.draggingNode = null
+                that.selectedNode = null
                 that.sort()
             )
 
@@ -641,6 +648,7 @@ $ ->
                 .append("text")
                 .attr("class", "clustername")
                 .text((d) -> d.name)
+                .moveToBack()
                 .style("opacity", "0.5")
                 .style("text-anchor", "middle")
                 .style("font-size", "20pt")
