@@ -651,10 +651,10 @@ $ ->
             node.exit().remove()
 
             @sort()
-
-    targetDom = "#field"
-    viewerWidth = $(targetDom).width()
-    viewerHeight = viewerWidth
-    d3.json($(targetDom).data("url"), (error, treeData) ->
-        new Cluster(targetDom, treeData, viewerWidth, viewerHeight)
-    )
+    $(document).on 'page:change', ->
+        targetDom = "#field"
+        viewerWidth = $(targetDom).width()
+        viewerHeight = viewerWidth
+        d3.json($(targetDom).data("url"), (error, treeData) ->
+            new Cluster(targetDom, treeData, viewerWidth, viewerHeight)
+        )
