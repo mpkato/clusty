@@ -253,11 +253,22 @@ $ ->
             element_id = draggingNode.id
             from_id = draggingNode.parent.id or -1
             to_id = selectedNode.id or -1
+
+            # fake update
+            that.localUpdateParent(draggingNode, selectedNode)
+            that.simplechildupdate([draggingNode.parent.id, selectedNode.id])
+
             that.updateElement(element_id, from_id, "destroy", (err, data) ->
                 that.updateElement(element_id, to_id, "create", (err, data) ->
                     that.childupdate([draggingNode.parent.id, selectedNode.id])
                 )
             )
+        
+        localUpdateParent: (draggingNode, selectedNode) ->
+            index = draggingNode.parent.elements.indexOf(draggingNode)
+            if index > -1
+                draggingNode.parent.elements.splice(index, 1)
+            selectedNode.elements.push(draggingNode)
 
         updateElement: (element_id, parent_id, method, callback) ->
             data = {cluster: {method: method, element_id: element_id}}
