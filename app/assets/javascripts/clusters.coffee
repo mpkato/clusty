@@ -306,6 +306,12 @@ $ ->
                 if !d.elements
                     that.draggingNode = d
                     that.sort()
+                    if d.selected
+                        that.svgGroup.selectAll("g.selected")
+                            .each((c) ->
+                                c.x0 = c.x
+                                c.y0 = c.y
+                            )
                 else
                     that.svgGroup.selectAll("g.child")
                         .filter((c) -> d.id == c.parent.id)
@@ -346,10 +352,26 @@ $ ->
                             c.y0 += dy
                         )
                         .attr("transform", (c) -> trans(c.x0, c.y0))
+                else
+                    if d.selected
+                        that.svgGroup.selectAll("g.selected")
+                            .filter((c) -> d.id != c.id)
+                            .each((c) ->
+                                c.x0 += dx
+                                c.y0 += dy
+                            )
+                            .attr("transform", (c) -> trans(c.x0, c.y0))
 
             ).on("dragend", (d) ->
                 if (that.draggingNode isnt null and that.selectedNode and that.selectedNode isnt that.draggingNode.parent)
                     that.updateParent(that.draggingNode, that.selectedNode)
+                    if that.draggingNode.selected
+                        that.svgGroup.selectAll("g.selected")
+                            .filter((c) -> that.draggingNode.id != c.id)
+                            .each((c) ->
+                                that.updateParent(c, that.selectedNode)
+                            )
+                        that.unselect()
                 else
                     if d.elements
                         d.x = d.x0
@@ -362,6 +384,10 @@ $ ->
                             )
                     else
                         d3.select(@).attr("transform", (c) -> trans(c.x, c.y))
+                        if d.selected
+                            that.svgGroup.selectAll("g.selected")
+                                .filter((c) -> d.id != c.id)
+                                .attr("transform", (c) -> trans(c.x, c.y))
                 that.draggingNode = null
                 that.selectedNode = null
                 that.sort()
@@ -481,6 +507,31 @@ $ ->
                 .each((d) ->
                     that.toggleSize(d)
                 )
+            @multiselectinit()
+
+        multiselectinit: ->
+            that = @
+            $("#field").selectable({
+                start: (e, ui) ->
+                    $(".d3-context-menu").css("display", "none")
+                    that.unselect()
+                selecting: (e, ui) ->
+                    elem = d3.select(ui.selecting)
+                    d = elem.datum()
+                    if elem.attr("class") == "node child"
+                        elem
+                            .attr("class", "node child selected")
+                            .select("rect")
+                            .style("fill", "blue")
+                        d.selected = true
+                })
+
+        unselect: ->
+            @svgGroup.selectAll("g.selected")
+                .attr("class", "node child")
+                .select("rect")
+                .style("fill", "lightsteelblue")
+                .each((d) -> delete d.selected)
 
         childupdate: (parent_ids) ->
             that = @
