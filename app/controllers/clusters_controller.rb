@@ -55,6 +55,9 @@ class ClustersController < ApplicationController
     # Use callbacks to share common setup or constraints between actions.
     def set_project
       @project = Project.includes([:elements, clusters: :elements]).find(params[:project_id])
+      if current_user.nil? or @project.user_id != current_user.id
+        render status: :unprocessable_entity
+      end
     end
 
     # Use callbacks to share common setup or constraints between actions.
