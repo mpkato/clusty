@@ -48,4 +48,16 @@ class Project < ActiveRecord::Base
     end
   end
 
+  def to_tsv
+    result = ''
+    elements = self.elements.includes(:clusters)
+    elements.each do |elem|
+      cluster_ids = elem.clusters.pluck(:id)
+      cluster_names = elem.clusters.pluck(:name)
+      result += [self.id, self.label, elem.key, elem.body, 
+        cluster_ids.join(','), cluster_names.join(',')].join("\t") + "\n"
+    end
+    return result
+  end
+
 end

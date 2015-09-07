@@ -11,6 +11,15 @@ class ProjectsController < ApplicationController
   # GET /projects/1
   # GET /projects/1.json
   def show
+    respond_to do |format|
+      format.html
+      format.tsv do
+        send_data(@project.to_tsv, 
+          type: 'text/tsv; charset=utf-8', 
+          filename: "#{@project.label}.tsv"
+        )
+      end
+    end
   end
 
   # GET /projects/new
