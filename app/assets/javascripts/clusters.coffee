@@ -441,6 +441,29 @@ $ ->
                 that.simplechildupdate([d.id])
             )
 
+        orphanResizeDragListener: ->
+            that = @
+            return d3.behavior.drag()
+            .on("dragstart", (d) ->
+                d3.event.sourceEvent.stopPropagation()
+            )
+            .on("drag", (d) ->
+                console.log(d)
+                d.width -= d3.event.dx
+                d.x += d3.event.dx
+                if d.width < Cluster.CHILD_WIDTH * 8
+                    d.width = Cluster.CHILD_WIDTH * 8
+                d3.select(@).attr("transform", (c) ->
+                    trans(c.x - 5, c.y))
+                that.svgGroup.selectAll("g.parent rect.orphan")
+                    .filter((c) -> c.id == d.id)
+                    .attr("transform", (c) -> trans(c.x, c.y))
+                    .attr("width", (c) -> c.width)
+            )
+            .on("dragend", (d) ->
+                that.simplechildupdate([d.id])
+            )
+
         treegrid: () ->
             that = @
             cols = Math.max(1, Math.min(
@@ -693,6 +716,23 @@ $ ->
                     that.toggleSize(d)
                     d3.event.preventDefault()
                 )
+
+            # handle for orphans
+            orphanhandles = nodeenter.filter((d) -> d.id is null)
+                .append("rect")
+                .attr('class', 'orphanresizehandle')
+                .style("fill", "black")
+                .style("opacity", "0.5")
+                .style("cursor", "ew-resize")
+                .attr('pointer-events', 'mouseover')
+                .attr('width', 5)
+                .attr('height', @root.height)
+                .attr("transform", (d) -> trans(d.x-5, d.y))
+                .call(@orphanResizeDragListener())
+            #    .on("contextmenu", (d) ->
+            #        that.toggleSize(d)
+            #        d3.event.preventDefault()
+            #    )
 
             # Cluster names
             nodeenter.filter((d) -> d.elements)
