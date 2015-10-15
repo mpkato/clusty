@@ -78,3 +78,5 @@ end
 
 # speed up JSON
 gem 'yajl-ruby'
+
+gem 'config'

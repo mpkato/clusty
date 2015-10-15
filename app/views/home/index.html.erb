@@ -1,2 +1,13 @@
-<h1>Home#index</h1>
-<p>Find me in app/views/home/index.html.erb</p>
+<h1><%= Settings.title %></h1>
+<p class="lead">
+  You may easily create questionnaires and ask guests to answer them.
+</p>
+<p class="lead">
+  Please first sign up at
+  <%= link_to 'Sign up', new_user_registration_path, class: 'btn btn-default btn-lg'%>
+</p>
+<p class="lead">
+  and then visit
+  <%= link_to 'Projects', projects_path, class: 'btn btn-default btn-lg' %>
+  to start your clustering task.
+</p>
